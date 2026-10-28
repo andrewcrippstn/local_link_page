@@ -72,6 +72,16 @@
     .sheet td .ro:hover{background:#eef6f1}
     .sheet td .ro .prev{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#444;flex:1;min-width:0}
     .sheet td .ro .badge{flex:none;font-size:11px;color:#217346;background:#e1f0e7;border-radius:9px;padding:0 7px}
+    /* ---- row drag & drop ---- */
+    .sheet td.rn .rn-wrap{display:flex;align-items:center;justify-content:center;gap:1px;height:25px;padding:0 2px}
+    .sheet td.rn .rn-num{flex:1;text-align:center;min-width:0;overflow:hidden}
+    .drag-handle{flex:none;cursor:grab;color:#9a9a9a;font-size:13px;line-height:1;padding:2px 3px;border-radius:3px;
+                 user-select:none;-webkit-user-select:none;touch-action:none}
+    .drag-handle:hover{background:#d6d6d6;color:#333}
+    .drag-handle:active{cursor:grabbing}
+    .sheet tbody tr.dragging{opacity:.45}
+    .sheet tbody tr.drop-above td{box-shadow:inset 0 2px 0 0 #217346}
+    .sheet tbody tr.drop-below td{box-shadow:inset 0 -2px 0 0 #217346}
     .hint{font-size:.78rem;color:#777;margin:8px 2px 40px}
     #cellDialog{margin:auto;border:0;border-radius:10px;padding:0;width:min(940px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.35)}
     #cellDialog::backdrop{background:rgba(0,0,0,.45)}
@@ -304,7 +314,9 @@ document.getElementById('grid').addEventListener('click', (event) => {
 const EDITOR_ROUTE = '_editor';
 const LONG_LEN = 80;     // longer than this (or containing a line break) => read-only cell, edited in a dialog
 const COL_W = { page: 110, text: 170, url: 260, icon: 170, desc: 220, copy: 300 };
+const RN_COL_W = 62;     // row-number column (drag handle + number)
 let edit = null;         // working copy: { rows: [{header: value}], dirty, filter }
+let dragState = null;    // { from } — index of the row currently being dragged
 
 function csvField(v) {
     v = v == null ? '' : String(v);
@@ -353,16 +365,17 @@ function renderEditor() {
             <button class="tbtn primary" id="edSave" title="Ctrl+S">Save</button>
             <button class="tbtn" id="edDiscard">Discard changes</button>
             <button class="tbtn" id="edAdd">+ Add row</button>
+            <button class="tbtn" id="edSort" title="Order rows the way the app displays them: page rows first, then each folder followed by its contents and sub-folders">Sort by hierarchy</button>
             <button class="tbtn" id="edDownload">Download CSV</button>
             <input type="search" id="edFilter" placeholder="Filter rows…">
             <span id="edStatus"></span>
         </div>
         <div class="sheet-wrap"><table class="sheet"><colgroup></colgroup><thead><tr></tr></thead><tbody></tbody></table></div>
-        <div class="hint">Cells longer than ${LONG_LEN} characters (or with line breaks) are read-only here – click one to edit the full text in a dialog.
+        <div class="hint">Drag the ⠿ handle in the row-number column to move a row. Cells longer than ${LONG_LEN} characters (or with line breaks) are read-only here – click one to edit the full text in a dialog.
             Pasting long text into any cell opens the same dialog. Changes are only stored when you press Save.</div>`;
     const table = host.querySelector('table');
-    let width = 46 + 76;
-    const cols = [colEl(46)];
+    let width = RN_COL_W + 76;
+    const cols = [colEl(RN_COL_W)];
     const headRow = table.querySelector('thead tr');
     const corner = document.createElement('th'); corner.className = 'corner'; corner.textContent = '#'; headRow.appendChild(corner);
     csvHeaders.forEach(h => {
@@ -385,6 +398,14 @@ function renderEditor() {
         edit.rows.push(blankRow(last && last.page));
         setDirty(); clearFilter(); renderRows(); focusRow(edit.rows.length - 1);
     });
+    document.getElementById('edSort').addEventListener('click', sortByHierarchy);
+
+    // drag & drop of whole rows (delegated on <tbody>, which survives re-renders)
+    const tbody = table.querySelector('tbody');
+    tbody.addEventListener('dragover', onRowDragOver);
+    tbody.addEventListener('drop', onRowDrop);
+    tbody.addEventListener('dragleave', e => { if (!tbody.contains(e.relatedTarget)) clearDragMarks(); });
+
     renderRows();
 }
 function colEl(w) { const c = document.createElement('col'); c.style.width = w + 'px'; return c; }
@@ -400,7 +421,23 @@ function renderRows() {
         if (needle && !csvHeaders.some(h => (row[h] || '').toLowerCase().includes(needle))) return;
         shown++;
         const tr = document.createElement('tr');
-        const rn = document.createElement('td'); rn.className = 'rn'; rn.textContent = r + 1; tr.appendChild(rn);
+        tr.dataset.r = r;
+
+        // row number + drag handle
+        const rn = document.createElement('td'); rn.className = 'rn';
+        const wrap = document.createElement('span'); wrap.className = 'rn-wrap';
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.textContent = '⠿';
+        handle.title = 'Drag to reorder this row';
+        handle.draggable = true;
+        handle.addEventListener('dragstart', e => onRowDragStart(e, r, tr));
+        handle.addEventListener('dragend', () => { dragState = null; clearDragMarks(); });
+        const num = document.createElement('span'); num.className = 'rn-num'; num.textContent = r + 1;
+        wrap.append(handle, num);
+        rn.appendChild(wrap);
+        tr.appendChild(rn);
+
         csvHeaders.forEach((h, c) => {
             const td = document.createElement('td'); td.dataset.r = r; td.dataset.c = c;
             fillCell(td, r, c); tr.appendChild(td);
@@ -427,6 +464,112 @@ function renderRows() {
 function focusRow(r) {
     const el = document.querySelector(`#editor td[data-r="${r}"][data-c="0"] input, #editor td[data-r="${r}"][data-c="0"] .ro`);
     if (el) { el.scrollIntoView({ block: 'nearest' }); el.focus(); }
+}
+
+/* ---------------- row drag & drop ---------------- */
+function onRowDragStart(e, r, tr) {
+    dragState = { from: r };
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', String(r)); } catch (_) {}
+    try { e.dataTransfer.setDragImage(tr, 16, 12); } catch (_) {}
+    tr.classList.add('dragging');
+}
+function clearDragMarks() {
+    document.querySelectorAll('#editor tr.dragging, #editor tr.drop-above, #editor tr.drop-below')
+        .forEach(t => t.classList.remove('dragging', 'drop-above', 'drop-below'));
+}
+function onRowDragOver(e) {
+    if (!dragState) return;
+    const tr = e.target.closest('tr');
+    if (!tr || tr.dataset.r == null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = tr.getBoundingClientRect();
+    const after = (e.clientY - rect.top) > rect.height / 2;
+    document.querySelectorAll('#editor tr.drop-above, #editor tr.drop-below').forEach(t => {
+        if (t !== tr) t.classList.remove('drop-above', 'drop-below');
+    });
+    tr.classList.toggle('drop-above', !after);
+    tr.classList.toggle('drop-below', after);
+}
+function onRowDrop(e) {
+    if (!dragState) return;
+    const tr = e.target.closest('tr');
+    if (!tr || tr.dataset.r == null) { dragState = null; clearDragMarks(); return; }
+    e.preventDefault();
+    const rect = tr.getBoundingClientRect();
+    const after = (e.clientY - rect.top) > rect.height / 2;
+    const from = dragState.from, target = +tr.dataset.r;
+    dragState = null;
+    clearDragMarks();
+    moveRow(from, target, after);
+}
+// move edit.rows[from] so that it lands before/after the row currently at index `target`
+function moveRow(from, target, after) {
+    if (!edit || from === target) return;
+    let insertAt = after ? target + 1 : target;
+    if (from < insertAt) insertAt--;             // account for the row being lifted out first
+    if (insertAt === from) return;
+    const [row] = edit.rows.splice(from, 1);
+    edit.rows.splice(insertAt, 0, row);
+    setDirty();
+    renderRows();
+}
+
+/* ---------------- hierarchy sort ---------------- */
+// Orders rows exactly like the app is browsed:
+//   page rows (non-folders) first, then for each folder: the folder row followed by
+//   everything on the page it points to (its own rows, then its folders and sub-folders…)
+//   then the next folder of the page, and so on. Unreachable pages are appended at the end.
+function sortByHierarchy() {
+    if (!edit) return;
+    if (!csvHeaders.includes('page') || !csvHeaders.includes('url')) {
+        updateEditStatus('Cannot sort: the data needs "page" and "url" columns');
+        return;
+    }
+    const rows = edit.rows;
+    const pageOf = row => (row.page || '').trim();
+    const urlOf = row => (row.url || '').trim();
+    const isFolderRow = row => urlOf(row).startsWith('#') && urlOf(row).length > 1;
+    const folderTarget = row => urlOf(row).slice(1).trim();
+
+    // group row indices by page, keeping the current order inside each page
+    const byPage = new Map();
+    rows.forEach((row, i) => {
+        const p = pageOf(row);
+        if (!byPage.has(p)) byPage.set(p, []);
+        byPage.get(p).push(i);
+    });
+
+    const visited = new Set();
+    const order = [];
+    const visit = page => {
+        if (visited.has(page)) return;           // guards against cycles / pages referenced twice
+        visited.add(page);
+        const list = byPage.get(page) || [];
+        const links = [], folders = [];
+        list.forEach(i => (isFolderRow(rows[i]) ? folders : links).push(i));
+        links.forEach(i => order.push(i));       // direct (non-folder) rows of the page
+        folders.forEach(i => {                   // then each folder, immediately followed by its contents
+            order.push(i);
+            visit(folderTarget(rows[i]));
+        });
+    };
+    visit('home');
+    // pages not reachable from Home: keep them, in order of first appearance
+    rows.forEach(row => {
+        const p = pageOf(row);
+        if (!visited.has(p)) visit(p);
+    });
+    // safety net: nothing may be lost
+    const seen = new Set(order);
+    rows.forEach((row, i) => { if (!seen.has(i)) order.push(i); });
+
+    edit.rows = order.map(i => rows[i]);
+    setDirty();
+    clearFilter();
+    renderRows();
+    updateEditStatus('Sorted by hierarchy — press Save to keep it');
 }
 
 // One cell: short text = normal editable input; long / multi-line text = read-only preview that opens the dialog
