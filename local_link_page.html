@@ -6,7 +6,7 @@
 <title id="pageTitle">Home</title>
 <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,system-ui,sans-serif;background:#f0f0f0;min-height:100vh;color:#333}
+    body{font-family:-apple-system,system-ui,sans-serif;background:#f0f0f0;min-height:100vh;color:#333;position:relative;padding-bottom:44px}
     header{background:white;padding:10px 20px;margin-bottom:40px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
     .header-container{max-width:1200px;margin:0 auto;position:relative;display:flex;align-items:center;justify-content:center}
     .container{max-width:1200px;margin:0 auto;padding:0 20px}
@@ -39,6 +39,34 @@
     .icon{width:40px;height:40px;margin-bottom:8px;object-fit:contain}
     .title{font-size:0.9rem;font-weight:600;text-shadow:none;margin-bottom:0;line-height:1.2}
     .desc{font-size:0.8rem;opacity:0.6;text-shadow:none;line-height:1.2;margin-top:4px}
+
+    /* ---- corner ribbon: tile has copy text ---- */
+    .ribbon{position:absolute;right:0;bottom:0;width:48px;height:48px;overflow:hidden;
+            border-bottom-right-radius:10px;pointer-events:none}
+    .ribbon span{position:absolute;left:-6px;top:28px;width:80px;height:12px;line-height:12px;
+                 background:#667eea;color:#fff;font-size:8px;font-weight:700;letter-spacing:.6px;
+                 text-align:center;transform:rotate(-45deg);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+
+    /* ---- arrange (edit) mode ---- */
+    .arrange-btn{position:absolute;top:0;right:50px;width:40px;height:40px;background:white;border:2px solid #e0e0e0;
+                 border-radius:8px;display:none;align-items:center;justify-content:center;cursor:pointer;transition:.2s;
+                 color:#667eea;font-size:20px;font-weight:bold}
+    .arrange-btn:hover{border-color:#667eea;background:#f8f8ff}
+    .arrange-btn.active{background:#667eea;border-color:#667eea;color:#fff}
+    .arrange-btn.show{display:flex}
+    #arrangeBar{display:none;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:8px 12px;
+                background:#eef0ff;border:1px solid #c9ceff;border-radius:8px;font-size:.85rem;color:#445}
+    #arrangeBar .spacer{flex:1}
+    #grid.arranging a.tile{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
+                           border-style:dashed;border-color:#9aa3f5}
+    #grid.arranging a.tile:hover{transform:none}
+    #grid.arranging a.tile *{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
+    #grid a.tile.dragging{z-index:20;opacity:.92;cursor:grabbing;transition:none;border-style:solid;
+                          border-color:#667eea;box-shadow:0 12px 28px rgba(0,0,0,.28)}
+    #grid a.tile.drop-before::before,#grid a.tile.drop-after::before{content:'';position:absolute;top:-2px;bottom:-2px;
+                          width:4px;background:#667eea;border-radius:2px;z-index:5}
+    #grid a.tile.drop-before::before{left:-10px}
+    #grid a.tile.drop-after::before{right:-10px}
 
     .editor-btn{position:absolute;top:0;right:100px;width:40px;height:40px;background:white;border:2px solid #e0e0e0;
                 border-radius:8px;display:none;align-items:center;justify-content:center;cursor:pointer;transition:.2s;
@@ -94,6 +122,29 @@
     .dlg-foot{display:flex;gap:8px;align-items:center;padding:10px 16px 14px}
     .dlg-foot label{font-size:.82rem;color:#444;display:flex;gap:5px;align-items:center;cursor:pointer}
     .dlg-foot .spacer{flex:1}
+
+    #grid a.tile.drop-into{border-color:#667eea;background:#eef0ff;box-shadow:0 0 0 3px rgba(102,126,234,.35)}
+    #upZone{display:none;margin-bottom:16px;padding:12px;text-align:center;border:2px dashed #9aa3f5;border-radius:10px;
+            color:#556;font-size:.85rem;background:#fafaff}
+    #upZone.over{background:#eef0ff;border-color:#667eea;border-style:solid}
+    #trashZone{display:none;position:fixed;right:24px;bottom:44px;width:84px;height:84px;border-radius:50%;
+               align-items:center;justify-content:center;flex-direction:column;gap:2px;z-index:15;
+               background:#fff;border:2px dashed #e08a8a;color:#c0392b;font-size:.7rem;font-weight:600;
+               box-shadow:0 2px 8px rgba(0,0,0,.15)}
+    #trashZone .ico{font-size:28px;line-height:1}
+    #trashZone.over{background:#fdecea;border-style:solid;border-color:#c0392b;transform:scale(1.12)}
+    #tdKind{font-size:.8rem;color:#445;background:#eef0ff;border:1px solid #c9ceff;border-radius:4px;padding:6px 8px}
+    /* ---- new-tile dialog (opened by pasting a link) ---- */
+    #tileDialog{margin:auto;border:0;border-radius:10px;padding:0;width:min(520px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.35)}
+    #tileDialog::backdrop{background:rgba(0,0,0,.45)}
+    .tile-dlg{height:auto;max-height:90vh}
+    .tile-fields{display:flex;flex-direction:column;gap:10px;padding:14px 16px 4px;overflow:auto}
+    .tile-fields label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:#555;font-weight:600}
+    .tile-fields label small{font-weight:400;color:#888}
+    .tile-fields input,.tile-fields textarea{border:1px solid #c6c6c6;border-radius:4px;padding:6px 8px;font:inherit;
+                                              font-size:.9rem;font-weight:400;color:#222;outline:none;resize:vertical}
+    .tile-fields input:focus,.tile-fields textarea:focus{border-color:#667eea}
+    #BUILD-FOOTER{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:.7rem;color:#aaa;user-select:none;pointer-events:none}
 </style>
 </head>
 <body>
@@ -101,6 +152,7 @@
     <div class="header-container">
         <a href="#home" class="home-btn" id="homeBtn" title="Home">⌂</a>
         <h1 id="pageHeader">Home</h1>
+        <button class="arrange-btn" id="arrangeBtn" title="Rearrange tiles">⇄</button>
         <button class="editor-btn" id="editorBtn" title="Edit data (spreadsheet view)">✎</button>
         <button class="download-btn" id="downloadBtn" title="Download CSV">↓</button>
         <button class="upload-btn" id="uploadBtn" title="Upload CSV">↑</button>
@@ -108,9 +160,17 @@
     </div>
 </header>
 <div class="container">
+    <div id="arrangeBar">
+        <span><strong>Arrange mode</strong> – drag tiles to reorder them, or drop one onto the middle of a folder to move it inside, or onto the bin to delete it. Tip: paste a link or text anywhere on the page to add a tile.</span>
+        <span class="spacer"></span>
+        <button class="tbtn primary" id="arrangeDone" type="button">Done</button>
+    </div>
+    <div id="upZone">↩ Drop a tile here to move it up to <b id="upName"></b></div>
     <div id="grid"></div>
+    <div id="trashZone"><span class="ico">🗑</span><span>Delete</span></div>
     <div id="editor"></div>
 </div>
+<div id="BUILD-FOOTER">BUILD: 2026-11-03 09:05:41</div>
 <dialog id="cellDialog">
     <div class="dlg">
         <div class="dlg-head"><span id="dlgTitle"></span><span class="dlg-count" id="dlgCount"></span></div>
@@ -123,6 +183,24 @@
             <button class="tbtn primary" id="dlgApply" type="button" title="Ctrl+Enter">Apply</button>
         </div>
     </div>
+</dialog>
+<dialog id="tileDialog">
+    <form class="dlg tile-dlg" id="tileForm" autocomplete="off">
+        <div class="dlg-head"><span id="tdHead">New tile</span></div>
+        <div class="tile-fields">
+            <div id="tdKind"></div>
+            <label>Title<input id="tdText" type="text" required></label>
+            <label>URL <small>(leave blank to create a folder)</small><input id="tdUrl" type="text" spellcheck="false"></label>
+            <label>Icon <small>(TRUE = site favicon, or an image URL, or leave blank for none)</small><input id="tdIcon" type="text" spellcheck="false"></label>
+            <label>Description <small>(optional)</small><input id="tdDesc" type="text"></label>
+            <label>Copy text <small>(optional – copied to the clipboard when the tile is clicked)</small><textarea id="tdCopy" rows="3" spellcheck="false"></textarea></label>
+        </div>
+        <div class="dlg-foot">
+            <span class="spacer"></span>
+            <button class="tbtn" id="tdCancel" type="button">Cancel</button>
+            <button class="tbtn primary" id="tdSubmit" type="submit">Add</button>
+        </div>
+    </form>
 </dialog>
 <script>
 // YOUR DATA — Edit only this CSV block at the bottom!
@@ -203,34 +281,47 @@ function setData(text) {
 }
 setData(loadCsvData());
 let visibleItems = [];
+let arrange = false;      // tile-arrange (edit) mode on/off
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function currentPage() { return location.hash.slice(1) || 'home'; }
 function render() {
-    const current = location.hash.slice(1) || 'home';
+    const current = currentPage();
+    const editing = current === EDITOR_ROUTE;
+    if (editing) arrange = false;
     document.getElementById('pageTitle').textContent =
     document.getElementById('pageHeader').textContent =
-        current === 'home' ? 'Home' : current === EDITOR_ROUTE ? 'Data editor' : current.charAt(0).toUpperCase() + current.slice(1);
+        current === 'home' ? 'Home' : editing ? 'Data editor' : current.charAt(0).toUpperCase() + current.slice(1);
    
     // Show/hide home button and upload button
     const homeBtn = document.getElementById('homeBtn');
     const uploadBtn = document.getElementById('uploadBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const editorBtn = document.getElementById('editorBtn');
+    const arrangeBtn = document.getElementById('arrangeBtn');
     const onHome = current === 'home';
     homeBtn.classList.toggle('show', !onHome);
     uploadBtn.classList.toggle('show', onHome);
     downloadBtn.classList.toggle('show', onHome);
     editorBtn.classList.toggle('show', onHome);
-
+    arrangeBtn.classList.toggle('show', !editing);
+    arrangeBtn.classList.toggle('active', arrange);
+    arrangeBtn.style.right = onHome ? '150px' : '50px';
+    document.getElementById('arrangeBar').style.display = arrange ? 'flex' : 'none';
+    document.getElementById('trashZone').style.display = (arrange && !editing) ? 'flex' : 'none';
+    const upRow = items.find(r => r.url === '#' + current);
+    document.getElementById('upZone').style.display = (arrange && !onHome && !editing) ? 'block' : 'none';
+    document.getElementById('upName').textContent = upRow ? (upRow.page === 'home' ? 'Home' : upRow.page) : 'Home';
     // The editor is a separate view that replaces the tile grid
-    const editing = current === EDITOR_ROUTE;
     document.getElementById('editor').style.display = editing ? 'block' : 'none';
     document.getElementById('grid').style.display = editing ? 'none' : '';
+    document.getElementById('grid').classList.toggle('arranging', arrange);
     document.querySelector('.container').classList.toggle('wide', editing);
     if (editing) { renderEditor(); return; }
    
     visibleItems = items.filter(item => item.page === current);
     const tiles = visibleItems
         .map((item, idx) => {
-            const isExternal = item.url.startsWith('http');
+            const isExternal = /^(https?|file):/i.test(item.url);
             const isFolder = item.url.startsWith('#') && item.url !== '#';
             const target = isExternal ? 'target="_blank"' : '';
             const href = item.url || '#';
@@ -247,18 +338,19 @@ function render() {
                     // Use the custom icon URL provided
                     iconUrl = item.icon;
                 }
-                iconHtml = `<img src="${iconUrl}" alt="" class="icon">`;
+                iconHtml = `<img src="${esc(iconUrl)}" alt="" class="icon" draggable="false">`;
             }
            
             return `
-                <a href="${href}" class="tile ${isFolder ? 'folder' : ''}" ${target} ${item.copy ? `data-copy-index="${idx}"` : ''}>
+                <a href="${esc(href)}" class="tile ${isFolder ? 'folder' : ''}" ${target} draggable="false" ${item.copy ? `data-copy-index="${idx}"` : ''}>
                     <div class="inner">
                         <div class="content">
                             ${iconHtml}
-                            <div class="title">${item.text}</div>
-                            ${item.desc ? `<div class="desc">${item.desc}</div>` : ''}
+                            <div class="title">${esc(item.text)}</div>
+                            ${item.desc ? `<div class="desc">${esc(item.desc)}</div>` : ''}
                         </div>
                     </div>
+                    ${item.copy ? '<div class="ribbon" aria-label="Copies text when clicked"><span>COPY</span></div>' : ''}
                 </a>`;
         }).join('');
     document.getElementById('grid').innerHTML = tiles;
@@ -290,7 +382,7 @@ function flash(tile, color) {
 }
 function go(href) {
     if (!href || href === '#') return;            // copy-only tile: stay on this page
-    if (href.startsWith('http')) window.open(href, '_blank');
+    if (/^(https?|file):/i.test(href)) window.open(href, '_blank');
     else window.location.href = href;
 }
 function copyText(tile, text) {
@@ -305,11 +397,267 @@ function copyText(tile, text) {
     });
 }
 document.getElementById('grid').addEventListener('click', (event) => {
+    if (arrange) {                                // arrange mode: tiles never navigate or copy
+        if (event.target.closest('a.tile')) event.preventDefault();
+        return;
+    }
     const tile = event.target.closest('a.tile[data-copy-index]');
     if (!tile) return;
     event.preventDefault();
     copyText(tile, visibleItems[tile.dataset.copyIndex].copy);
 });
+
+/* ======================= Arrange mode (drag tiles to reorder) ======================= */
+const gridEl = document.getElementById('grid');
+let drag = null;     // { tile, from, x, y, sx, sy, moved, target, after }
+
+function setArrange(on) { arrange = on; render(); }
+// write the current `items` back to storage and redraw
+function persistItems() {
+    const text = serializeCsv(csvHeaders, items);
+    try { saveCsvData(text); }
+    catch (e) { alert('Could not save to browser storage (' + e.message + ').'); }
+    setData(text);
+    render();
+}
+// move the tile at position `from` (among this page's tiles) before/after the tile at position `to`
+function reorderTiles(from, to, after) {
+    const page = currentPage();
+    const slots = [];                                   // positions in `items` occupied by this page's tiles
+    items.forEach((it, i) => { if (it.page === page) slots.push(i); });
+    const list = slots.map(i => items[i]);
+    let insertAt = after ? to + 1 : to;
+    if (from < insertAt) insertAt--;                    // account for the tile being lifted out first
+    if (insertAt === from) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(insertAt, 0, moved);
+    slots.forEach((s, k) => { items[s] = list[k]; });   // other pages keep their rows exactly where they were
+    persistItems();
+}
+// true if page `dest` is `root` itself or sits somewhere below it (used to stop a folder being moved into itself)
+function insideFolder(dest, root) {
+    const seen = new Set(), q = [root];
+    while (q.length) {
+        const pg = q.pop();
+        if (pg === dest) return true;
+        if (seen.has(pg)) continue;
+        seen.add(pg);
+        items.forEach(r => { if (r.page === pg && r.url.startsWith('#') && r.url.length > 1) q.push(r.url.slice(1)); });
+    }
+    return false;
+}
+// delete the tile at position `from`; a folder takes everything inside it along (after a confirmation)
+function deleteTile(from) {
+    const item = visibleItems[from];
+    if (!item) return;
+    const doomed = new Set([item]);
+    if (item.url.startsWith('#') && item.url.length > 1) {
+        const pages = new Set(), q = [item.url.slice(1)];
+        while (q.length) {
+            const pg = q.pop();
+            if (pages.has(pg)) continue;
+            pages.add(pg);
+            items.forEach(r => { if (r.page === pg) { doomed.add(r); if (r.url.startsWith('#') && r.url.length > 1) q.push(r.url.slice(1)); } });
+        }
+    }
+    const inside = doomed.size - 1;
+    const msg = inside > 0 ? `Delete folder "${item.text}" and the ${inside} item${inside === 1 ? '' : 's'} inside it?`
+                           : `Delete "${item.text}"?`;
+    if (!confirm(msg)) return;
+    items = items.filter(r => !doomed.has(r));
+    persistItems();
+}
+function upPageName() {
+    const row = items.find(r => r.url === '#' + currentPage());
+    return row ? row.page : 'home';
+}
+// move the tile at position `from` on this page onto the end of page `dest`
+function moveToPage(from, dest) {
+    const item = visibleItems[from];
+    if (!item || !dest || dest === item.page) return;
+    if (item.url.startsWith('#') && item.url.length > 1 && insideFolder(dest, item.url.slice(1))) return;   // no cycles
+    items.splice(items.indexOf(item), 1);
+    item.page = dest;
+    let last = -1;
+    items.forEach((it, i) => { if (it.page === dest) last = i; });
+    if (last < 0) items.push(item); else items.splice(last + 1, 0, item);
+    persistItems();
+}
+function clearDropMarks() {
+    gridEl.querySelectorAll('.drop-before,.drop-after,.drop-into').forEach(t => t.classList.remove('drop-before', 'drop-after', 'drop-into'));
+    document.getElementById('upZone').classList.remove('over');
+    document.getElementById('trashZone').classList.remove('over');
+}
+gridEl.addEventListener('pointerdown', e => {
+    if (!arrange || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const tile = e.target.closest('a.tile');
+    if (!tile) return;
+    e.preventDefault();
+    drag = { tile, from: Array.prototype.indexOf.call(gridEl.children, tile),
+             x: e.clientX, y: e.clientY, sx: window.scrollX, sy: window.scrollY,
+             moved: false, target: null, after: false, into: false, up: false, trash: false };
+});
+document.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x + (window.scrollX - drag.sx);
+    const dy = e.clientY - drag.y + (window.scrollY - drag.sy);
+    if (!drag.moved) {
+        if (Math.hypot(dx, dy) < 6) return;             // small wobble = a click, not a drag
+        drag.moved = true;
+        drag.tile.classList.add('dragging');
+        drag.tile.style.pointerEvents = 'none';         // so elementFromPoint sees the tile underneath
+    }
+    drag.tile.style.transform = `translate(${dx}px,${dy}px)`;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const t = el && el.closest ? el.closest('#grid a.tile') : null;
+    clearDropMarks();
+    drag.target = null; drag.into = false; drag.up = false; drag.trash = false;
+    const up = el && el.closest ? el.closest('#upZone') : null;
+    const bin = el && el.closest ? el.closest('#trashZone') : null;
+    if (bin) { drag.trash = true; bin.classList.add('over'); }
+    else if (up) { drag.up = true; up.classList.add('over'); }
+    else if (t && t !== drag.tile) {
+        const r = t.getBoundingClientRect();
+        const rel = (e.clientX - r.left) / r.width;
+        drag.target = t;
+        if (t.classList.contains('folder') && rel > 0.25 && rel < 0.75) {   // middle of a folder = drop inside it
+            drag.into = true;
+            t.classList.add('drop-into');
+        } else {
+            drag.after = rel > 0.5;
+            t.classList.add(drag.after ? 'drop-after' : 'drop-before');
+        }
+    }
+});
+function endDrag(commit) {
+    if (!drag) return;
+    const d = drag; drag = null;
+    clearDropMarks();
+    d.tile.classList.remove('dragging');
+    d.tile.style.transform = '';
+    d.tile.style.pointerEvents = '';
+    if (commit && d.moved) {
+        const toIdx = d.target ? Array.prototype.indexOf.call(gridEl.children, d.target) : -1;
+        if (d.trash) deleteTile(d.from);
+        else if (d.up) moveToPage(d.from, upPageName());
+        else if (d.target && d.into) moveToPage(d.from, visibleItems[toIdx].url.slice(1));
+        else if (d.target) reorderTiles(d.from, toIdx, d.after);
+    }
+}
+document.addEventListener('pointerup', () => endDrag(true));
+document.addEventListener('pointercancel', () => endDrag(false));
+document.getElementById('arrangeBtn').addEventListener('click', () => setArrange(!arrange));
+document.getElementById('arrangeDone').addEventListener('click', () => setArrange(false));
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && arrange && !document.querySelector('dialog[open]')) setArrange(false);
+});
+
+/* ======================= Paste a link -> new tile dialog ======================= */
+const tileDialog = document.getElementById('tileDialog');
+const byId = id => document.getElementById(id);
+
+// returns a clean http(s) URL if `text` is a single link (a bare "example.com/path" is accepted too), else null
+function normalizeLink(text) {
+    let s = (text || '').trim();
+    if (/^file:\/\//i.test(s) && !/[\r\n]/.test(s)) return s.replace(/ /g, '%20');   // file:// links (may contain spaces)
+    if (!s || /\s/.test(s)) return null;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
+        if (!/^[\w-]+(\.[\w-]+)+(:\d+)?([\/?#]\S*)?$/.test(s)) return null;
+        s = 'https://' + s;
+    }
+    try { const u = new URL(s); return /^(https?|file):$/.test(u.protocol) ? u.href : null; }
+    catch (_) { return null; }
+}
+function guessTitle(href) {
+    if (/^file:/i.test(href)) {
+        const seg = href.split(/[?#]/)[0].split('/').filter(Boolean).pop() || 'File';
+        let name = seg; try { name = decodeURIComponent(seg); } catch (_) {}
+        return name.replace(/\.[^.]+$/, '') || name;
+    }
+    try {
+        const parts = new URL(href).hostname.replace(/^www\./, '').split('.');
+        const base = parts.length > 1 ? parts[parts.length - 2] : parts[0];
+        return base.charAt(0).toUpperCase() + base.slice(1);
+    } catch (_) { return ''; }
+}
+// Open the dialog for pasted clipboard text: a link prefills the URL, anything else prefills the copy text
+function openTileDialog(pasted) {
+    if (tileDialog.open) return;
+    const href = normalizeLink(pasted);
+    if (href) {
+        byId('tdText').value = guessTitle(href);
+        byId('tdUrl').value = href;
+        byId('tdIcon').value = /^file:/i.test(href) ? '' : 'TRUE';
+        byId('tdCopy').value = '';
+    } else {
+        const first = pasted.trim().split(/\r?\n/)[0].trim();
+        byId('tdText').value = first.length > 40 ? first.slice(0, 40).trim() + '…' : first;
+        byId('tdUrl').value = '';
+        byId('tdIcon').value = '';
+        byId('tdCopy').value = '';
+    }
+    byId('tdDesc').value = '';
+    updateTileKind(href ? 'Pasted a link' : 'Pasted text');
+    tileDialog.showModal();
+    byId('tdText').focus();
+    byId('tdText').select();
+}
+// what will be created, based on the form (no URL and no copy text => folder)
+function tileKind() {
+    if (byId('tdUrl').value.trim()) return 'tile';
+    return byId('tdCopy').value ? 'copy' : 'folder';
+}
+function updateTileKind(prefix) {
+    if (prefix != null) updateTileKind.prefix = prefix;
+    const k = tileKind();
+    byId('tdHead').textContent = k === 'folder' ? 'New folder' : 'New tile';
+    byId('tdSubmit').textContent = k === 'folder' ? 'Add folder' : 'Add tile';
+    byId('tdKind').textContent = (updateTileKind.prefix ? updateTileKind.prefix + ' – ' : '') +
+        (k === 'tile' ? 'this will create a link tile.' :
+         k === 'copy' ? 'no URL, so this will create a copy-only tile (click it to copy the text).' :
+                        'no URL, so this will create a folder.');
+}
+['tdUrl', 'tdCopy'].forEach(id => byId(id).addEventListener('input', () => updateTileKind()));
+document.addEventListener('paste', e => {
+    if (document.querySelector('dialog[open]')) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('input,textarea,select,[contenteditable]')) return;
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!text || !text.trim()) return;
+    e.preventDefault();
+    openTileDialog(text);
+});
+byId('tdCancel').addEventListener('click', () => tileDialog.close());
+byId('tileForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const kind = tileKind();
+    const text = byId('tdText').value.trim();
+    let url = byId('tdUrl').value.trim();
+    // empty URL => folder: "#" + the title with spaces as underscores (e.g. "Diff Checkers" -> #Diff_Checkers)
+    const slug = s => s.trim().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+    if (kind === 'folder') { url = '#' + slug(text); byId('tdUrl').value = url; }
+    if (!text || url === '#') return;
+    const page = currentPage() === EDITOR_ROUTE ? 'home' : currentPage();   // new tiles go on the page being viewed
+    const icon = kind === 'folder' ? '' : byId('tdIcon').value.trim();
+    const vals = { page, text, url, icon: (kind === 'copy' && icon.toLowerCase() === 'true') ? '' : icon,
+                   desc: byId('tdDesc').value.trim(), copy: byId('tdCopy').value };
+    const row = {};
+    csvHeaders.forEach(h => { row[h] = (h in vals) ? vals[h] : ''; });
+    tileDialog.close();
+    if (currentPage() === EDITOR_ROUTE && edit) {               // data editor: add to the unsaved working copy
+        let lastR = -1;
+        edit.rows.forEach((r, i) => { if (r.page === page) lastR = i; });
+        if (lastR < 0) edit.rows.push(row); else edit.rows.splice(lastR + 1, 0, row);
+        setDirty(); clearFilter(); renderRows();
+        updateEditStatus('Added "' + text + '" — press Save to keep it');
+        return;
+    }
+    let last = -1;                                              // place it after the last tile already on that page
+    items.forEach((it, i) => { if (it.page === page) last = i; });
+    if (last < 0) items.push(row); else items.splice(last + 1, 0, row);
+    persistItems();
+});
+
 /* ======================= In-app CSV editor ======================= */
 const EDITOR_ROUTE = '_editor';
 const LONG_LEN = 80;     // longer than this (or containing a line break) => read-only cell, edited in a dialog
@@ -432,7 +780,7 @@ function renderRows() {
         handle.title = 'Drag to reorder this row';
         handle.draggable = true;
         handle.addEventListener('dragstart', e => onRowDragStart(e, r, tr));
-        handle.addEventListener('dragend', () => { dragState = null; clearDragMarks(); });
+        handle.addEventListener('dragend', () => { dragState = null; clearRowDragMarks(); });
         const num = document.createElement('span'); num.className = 'rn-num'; num.textContent = r + 1;
         wrap.append(handle, num);
         rn.appendChild(wrap);
@@ -466,7 +814,7 @@ function focusRow(r) {
     if (el) { el.scrollIntoView({ block: 'nearest' }); el.focus(); }
 }
 
-/* ---------------- row drag & drop ---------------- */
+/* ---------------- row drag & drop (data editor) ---------------- */
 function onRowDragStart(e, r, tr) {
     dragState = { from: r };
     e.dataTransfer.effectAllowed = 'move';
@@ -474,7 +822,7 @@ function onRowDragStart(e, r, tr) {
     try { e.dataTransfer.setDragImage(tr, 16, 12); } catch (_) {}
     tr.classList.add('dragging');
 }
-function clearDragMarks() {
+function clearRowDragMarks() {
     document.querySelectorAll('#editor tr.dragging, #editor tr.drop-above, #editor tr.drop-below')
         .forEach(t => t.classList.remove('dragging', 'drop-above', 'drop-below'));
 }
@@ -495,13 +843,13 @@ function onRowDragOver(e) {
 function onRowDrop(e) {
     if (!dragState) return;
     const tr = e.target.closest('tr');
-    if (!tr || tr.dataset.r == null) { dragState = null; clearDragMarks(); return; }
+    if (!tr || tr.dataset.r == null) { dragState = null; clearRowDragMarks(); return; }
     e.preventDefault();
     const rect = tr.getBoundingClientRect();
     const after = (e.clientY - rect.top) > rect.height / 2;
     const from = dragState.from, target = +tr.dataset.r;
     dragState = null;
-    clearDragMarks();
+    clearRowDragMarks();
     moveRow(from, target, after);
 }
 // move edit.rows[from] so that it lands before/after the row currently at index `target`
@@ -740,3 +1088,16 @@ render();
 </script>
 </body>
 </html>
+<!--
+  ============================================================
+  BUILD: 2026-11-03 09:05:41 (local)
+  ------------------------------------------------------------
+  MAINTENANCE RULE — READ BEFORE EDITING THIS FILE:
+  Whenever the code in this file is modified in any way,
+  update the BUILD line above AND the matching build text
+  in the page footer (search for "BUILD-FOOTER") to the
+  current date and time, in the exact same format:
+      YYYY-MM-DD HH:MM:SS
+  Do not add or remove anything else on those lines.
+  ============================================================
+-->
