@@ -144,6 +144,15 @@
     .tile-fields input,.tile-fields textarea{border:1px solid #c6c6c6;border-radius:4px;padding:6px 8px;font:inherit;
                                               font-size:.9rem;font-weight:400;color:#222;outline:none;resize:vertical}
     .tile-fields input:focus,.tile-fields textarea:focus{border-color:#667eea}
+    .add-btn{position:absolute;top:0;width:40px;height:40px;background:white;border:2px solid #e0e0e0;border-radius:8px;
+             display:none;align-items:center;justify-content:center;cursor:pointer;transition:.2s;color:#667eea;font-size:20px;font-weight:bold}
+    .add-btn:hover{border-color:#667eea;background:#f8f8ff}
+    .add-btn.show{display:flex}
+    #toast{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);display:none;align-items:center;gap:14px;
+           background:#333;color:#fff;padding:10px 14px;border-radius:8px;font-size:.85rem;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:30}
+    #toast button{background:none;border:0;color:#9aa3f5;font:inherit;font-weight:600;cursor:pointer}
+    .tbtn.danger{color:#c0392b;border-color:#e08a8a}
+    .tbtn.danger:hover{background:#fdecea}
     #BUILD-FOOTER{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:.7rem;color:#aaa;user-select:none;pointer-events:none}
 </style>
 </head>
@@ -152,6 +161,7 @@
     <div class="header-container">
         <a href="#home" class="home-btn" id="homeBtn" title="Home">⌂</a>
         <h1 id="pageHeader">Home</h1>
+        <button class="add-btn" id="addBtn" title="Add a tile (or just paste a link)">+</button>
         <button class="arrange-btn" id="arrangeBtn" title="Rearrange tiles">⇄</button>
         <button class="editor-btn" id="editorBtn" title="Edit data (spreadsheet view)">✎</button>
         <button class="download-btn" id="downloadBtn" title="Download CSV">↓</button>
@@ -161,16 +171,17 @@
 </header>
 <div class="container">
     <div id="arrangeBar">
-        <span><strong>Arrange mode</strong> – drag tiles to reorder them, or drop one onto the middle of a folder to move it inside, or onto the bin to delete it. Tip: paste a link or text anywhere on the page to add a tile.</span>
         <span class="spacer"></span>
         <button class="tbtn primary" id="arrangeDone" type="button">Done</button>
     </div>
     <div id="upZone">↩ Drop a tile here to move it up to <b id="upName"></b></div>
     <div id="grid"></div>
+    <datalist id="pageList"></datalist>
     <div id="trashZone"><span class="ico">🗑</span><span>Delete</span></div>
     <div id="editor"></div>
 </div>
-<div id="BUILD-FOOTER">BUILD: 2026-11-03 09:05:41</div>
+<div id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastUndo">Undo</button></div>
+<div id="BUILD-FOOTER">BUILD: 2026-11-07 15:09:00</div>
 <dialog id="cellDialog">
     <div class="dlg">
         <div class="dlg-head"><span id="dlgTitle"></span><span class="dlg-count" id="dlgCount"></span></div>
@@ -196,6 +207,7 @@
             <label>Copy text <small>(optional – copied to the clipboard when the tile is clicked)</small><textarea id="tdCopy" rows="3" spellcheck="false"></textarea></label>
         </div>
         <div class="dlg-foot">
+            <button class="tbtn danger" id="tdDelete" type="button" style="display:none">Delete</button>
             <span class="spacer"></span>
             <button class="tbtn" id="tdCancel" type="button">Cancel</button>
             <button class="tbtn primary" id="tdSubmit" type="submit">Add</button>
@@ -262,13 +274,15 @@ function parseCsv(csvText) {
 }
 
 // Load CSV data from localStorage or use default
+let memStore = null;
 function loadCsvData() {
-    const saved = localStorage.getItem('csvData');
-    return saved ? saved : defaultCsvData;
+    try { const saved = localStorage.getItem('csvData'); if (saved) return saved; } catch (e) {}
+    return memStore || defaultCsvData;
 }
 
 // Storage functions
 function saveCsvData(csvContent) {
+    memStore = csvContent;
     localStorage.setItem('csvData', csvContent);
 }
 
@@ -281,6 +295,33 @@ function setData(text) {
 }
 setData(loadCsvData());
 let visibleItems = [];
+// ---- undo history (every change to the tiles can be undone with Ctrl/Cmd+Z or the toast button) ----
+const undoStack = [];
+let toastTimer = null;
+function pushUndo() { undoStack.push(csvData); if (undoStack.length > 30) undoStack.shift(); }
+function showToast(msg) {
+    document.getElementById('toastMsg').textContent = msg;
+    document.getElementById('toastUndo').style.display = undoStack.length ? '' : 'none';
+    document.getElementById('toast').style.display = 'flex';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 7000);
+}
+function hideToast() { document.getElementById('toast').style.display = 'none'; }
+function undo() {
+    if (!undoStack.length) return;
+    const text = undoStack.pop();
+    try { saveCsvData(text); } catch (e) {}
+    setData(text);
+    render();
+    showToast('Undone');
+}
+document.getElementById('toastUndo').addEventListener('click', undo);
+document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
+    if (document.querySelector('dialog[open]') || (e.target.closest && e.target.closest('input,textarea'))) return;
+    if (currentPage() === EDITOR_ROUTE) return;
+    e.preventDefault(); undo();
+});
 let arrange = false;      // tile-arrange (edit) mode on/off
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function currentPage() { return location.hash.slice(1) || 'home'; }
@@ -306,6 +347,9 @@ function render() {
     arrangeBtn.classList.toggle('show', !editing);
     arrangeBtn.classList.toggle('active', arrange);
     arrangeBtn.style.right = onHome ? '150px' : '50px';
+    const addBtn = document.getElementById('addBtn');
+    addBtn.classList.toggle('show', !editing);
+    addBtn.style.right = onHome ? '200px' : '100px';
     document.getElementById('arrangeBar').style.display = arrange ? 'flex' : 'none';
     document.getElementById('trashZone').style.display = (arrange && !editing) ? 'flex' : 'none';
     const upRow = items.find(r => r.url === '#' + current);
@@ -398,7 +442,11 @@ function copyText(tile, text) {
 }
 document.getElementById('grid').addEventListener('click', (event) => {
     if (arrange) {                                // arrange mode: tiles never navigate or copy
-        if (event.target.closest('a.tile')) event.preventDefault();
+        const t = event.target.closest('a.tile');
+        if (t) {
+            event.preventDefault();
+            if (!justDragged) openEditDialog(visibleItems[Array.prototype.indexOf.call(gridEl.children, t)]);
+        }
         return;
     }
     const tile = event.target.closest('a.tile[data-copy-index]');
@@ -409,16 +457,19 @@ document.getElementById('grid').addEventListener('click', (event) => {
 
 /* ======================= Arrange mode (drag tiles to reorder) ======================= */
 const gridEl = document.getElementById('grid');
-let drag = null;     // { tile, from, x, y, sx, sy, moved, target, after }
+let drag = null;
+let justDragged = false;   // a drag just ended: ignore the click that follows it     // { tile, from, x, y, sx, sy, moved, target, after }
 
 function setArrange(on) { arrange = on; render(); }
 // write the current `items` back to storage and redraw
-function persistItems() {
+function persistItems(msg) {
+    pushUndo();
     const text = serializeCsv(csvHeaders, items);
     try { saveCsvData(text); }
     catch (e) { alert('Could not save to browser storage (' + e.message + ').'); }
     setData(text);
     render();
+    if (msg) showToast(msg);
 }
 // move the tile at position `from` (among this page's tiles) before/after the tile at position `to`
 function reorderTiles(from, to, after) {
@@ -463,9 +514,9 @@ function deleteTile(from) {
     const inside = doomed.size - 1;
     const msg = inside > 0 ? `Delete folder "${item.text}" and the ${inside} item${inside === 1 ? '' : 's'} inside it?`
                            : `Delete "${item.text}"?`;
-    if (!confirm(msg)) return;
+    if (inside > 0 && !confirm(msg)) return;
     items = items.filter(r => !doomed.has(r));
-    persistItems();
+    persistItems(`Deleted "${item.text}"` + (inside > 0 ? ` and ${inside} inside` : ''));
 }
 function upPageName() {
     const row = items.find(r => r.url === '#' + currentPage());
@@ -481,7 +532,7 @@ function moveToPage(from, dest) {
     let last = -1;
     items.forEach((it, i) => { if (it.page === dest) last = i; });
     if (last < 0) items.push(item); else items.splice(last + 1, 0, item);
-    persistItems();
+    persistItems(`Moved "${item.text}" to ${dest === 'home' ? 'Home' : dest}`);
 }
 function clearDropMarks() {
     gridEl.querySelectorAll('.drop-before,.drop-after,.drop-into').forEach(t => t.classList.remove('drop-before', 'drop-after', 'drop-into'));
@@ -532,6 +583,7 @@ document.addEventListener('pointermove', e => {
 function endDrag(commit) {
     if (!drag) return;
     const d = drag; drag = null;
+    if (d.moved) { justDragged = true; setTimeout(() => { justDragged = false; }, 60); }
     clearDropMarks();
     d.tile.classList.remove('dragging');
     d.tile.style.transform = '';
@@ -555,6 +607,7 @@ document.addEventListener('keydown', e => {
 /* ======================= Paste a link -> new tile dialog ======================= */
 const tileDialog = document.getElementById('tileDialog');
 const byId = id => document.getElementById(id);
+let editTarget = null;     // the tile row being edited (null = creating a new one)
 
 // returns a clean http(s) URL if `text` is a single link (a bare "example.com/path" is accepted too), else null
 function normalizeLink(text) {
@@ -583,6 +636,7 @@ function guessTitle(href) {
 // Open the dialog for pasted clipboard text: a link prefills the URL, anything else prefills the copy text
 function openTileDialog(pasted) {
     if (tileDialog.open) return;
+    editTarget = null;
     const href = normalizeLink(pasted);
     if (href) {
         byId('tdText').value = guessTitle(href);
@@ -602,6 +656,36 @@ function openTileDialog(pasted) {
     byId('tdText').focus();
     byId('tdText').select();
 }
+function openNewTileDialog() {
+    if (tileDialog.open) return;
+    editTarget = null;
+    ['tdText', 'tdUrl', 'tdDesc', 'tdCopy'].forEach(id => { byId(id).value = ''; });
+    byId('tdIcon').value = 'TRUE';
+    updateTileKind('');
+    tileDialog.showModal();
+    byId('tdText').focus();
+}
+function openEditDialog(item) {
+    if (tileDialog.open || !item) return;
+    editTarget = item;
+    byId('tdText').value = item.text; byId('tdUrl').value = item.url; byId('tdIcon').value = item.icon;
+    byId('tdDesc').value = item.desc; byId('tdCopy').value = item.copy;
+    updateTileKind('');
+    tileDialog.showModal();
+    byId('tdText').focus();
+    byId('tdText').select();
+}
+function addLinkTiles(hrefs) {
+    const page = currentPage();
+    let last = -1;
+    items.forEach((it, i) => { if (it.page === page) last = i; });
+    const rows = hrefs.map(u => {
+        const row = {}; csvHeaders.forEach(k => { row[k] = ''; });
+        return Object.assign(row, { page, text: guessTitle(u), url: u, icon: /^file:/i.test(u) ? '' : 'TRUE' });
+    });
+    items.splice(last < 0 ? items.length : last + 1, 0, ...rows);
+    persistItems(`Added ${rows.length} tiles`);
+}
 // what will be created, based on the form (no URL and no copy text => folder)
 function tileKind() {
     if (byId('tdUrl').value.trim()) return 'tile';
@@ -610,8 +694,12 @@ function tileKind() {
 function updateTileKind(prefix) {
     if (prefix != null) updateTileKind.prefix = prefix;
     const k = tileKind();
-    byId('tdHead').textContent = k === 'folder' ? 'New folder' : 'New tile';
-    byId('tdSubmit').textContent = k === 'folder' ? 'Add folder' : 'Add tile';
+    const editing = !!editTarget, u = byId('tdUrl').value.trim();
+    const noun = (k === 'folder' || (u.startsWith('#') && u.length > 1)) ? 'folder' : 'tile';
+    byId('tdHead').textContent = (editing ? 'Edit ' : 'New ') + noun;
+    byId('tdSubmit').textContent = editing ? 'Save' : 'Add ' + noun;
+    byId('tdKind').style.display = editing ? 'none' : '';
+    byId('tdDelete').style.display = editing ? 'inline-block' : 'none';
     byId('tdKind').textContent = (updateTileKind.prefix ? updateTileKind.prefix + ' – ' : '') +
         (k === 'tile' ? 'this will create a link tile.' :
          k === 'copy' ? 'no URL, so this will create a copy-only tile (click it to copy the text).' :
@@ -625,9 +713,19 @@ document.addEventListener('paste', e => {
     const text = (e.clipboardData || window.clipboardData).getData('text');
     if (!text || !text.trim()) return;
     e.preventDefault();
+    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const links = lines.map(normalizeLink);
+    if (lines.length > 1 && links.every(Boolean) && currentPage() !== EDITOR_ROUTE) { addLinkTiles(links); return; }
     openTileDialog(text);
 });
 byId('tdCancel').addEventListener('click', () => tileDialog.close());
+tileDialog.addEventListener('close', () => { editTarget = null; });
+byId('addBtn').addEventListener('click', openNewTileDialog);
+byId('tdDelete').addEventListener('click', () => {
+    const t = editTarget; tileDialog.close();
+    const idx = visibleItems.indexOf(t);
+    if (idx >= 0) deleteTile(idx);
+});
 byId('tileForm').addEventListener('submit', e => {
     e.preventDefault();
     const kind = tileKind();
@@ -644,6 +742,15 @@ byId('tileForm').addEventListener('submit', e => {
     const row = {};
     csvHeaders.forEach(h => { row[h] = (h in vals) ? vals[h] : ''; });
     tileDialog.close();
+    if (editTarget) {                                           // editing an existing tile
+        const t = editTarget, oldUrl = t.url;
+        Object.assign(t, { text, url, icon: vals.icon, desc: vals.desc, copy: vals.copy });
+        if (oldUrl.startsWith('#') && oldUrl.length > 1 && url !== oldUrl && url.startsWith('#') && url.length > 1) {
+            items.forEach(r => { if (r.page === oldUrl.slice(1)) r.page = url.slice(1); });   // keep the folder's contents attached
+        }
+        persistItems(`Saved "${text}"`);
+        return;
+    }
     if (currentPage() === EDITOR_ROUTE && edit) {               // data editor: add to the unsaved working copy
         let lastR = -1;
         edit.rows.forEach((r, i) => { if (r.page === page) lastR = i; });
@@ -807,6 +914,8 @@ function renderRows() {
     tbody.innerHTML = '';
     tbody.appendChild(frag);
     edit.shown = shown;
+    document.getElementById('pageList').innerHTML = Array.from(new Set(edit.rows.map(r => r.page).filter(Boolean)))
+        .map(p => '<option value="' + esc(p) + '">').join('');
     updateEditStatus();
 }
 function focusRow(r) {
@@ -940,6 +1049,7 @@ function fillCell(cell, r, c) {
     }
     const inp = document.createElement('input');
     inp.type = 'text'; inp.value = v; inp.spellcheck = false;
+    if (h === 'page') inp.setAttribute('list', 'pageList');
     inp.addEventListener('input', () => { edit.rows[r][h] = inp.value; setDirty(); });
     inp.addEventListener('change', () => { if (isLong(inp.value)) fillCell(cell, r, c); });   // grew past the limit -> read-only
     inp.addEventListener('paste', e => {
@@ -1032,6 +1142,38 @@ document.addEventListener('keydown', e => {
 });
 
 
+function importCsv(text, name) {
+    const p = parseCsv(text);
+    if (!['page', 'text', 'url'].every(c => p.headers.includes(c))) {
+        alert('"' + name + '" is not a tile file: it needs page, text and url columns.');
+        return;
+    }
+    if (!confirm('Replace your ' + items.length + ' current tiles with the ' + p.items.length + ' in "' + name + '"?\n(You can undo this.)')) return;
+    pushUndo();
+    saveCsvData(text);
+    setData(text);
+    edit = null;
+    location.hash = 'home';
+    render();
+    showToast('Imported ' + p.items.length + ' tiles');
+}
+document.addEventListener('dragover', e => {
+    const types = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
+    if (!dragState && currentPage() !== EDITOR_ROUTE && (types.includes('Files') || types.includes('text/uri-list'))) e.preventDefault();
+});
+document.addEventListener('drop', e => {
+    if (dragState || currentPage() === EDITOR_ROUTE || !e.dataTransfer) return;
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) {
+        e.preventDefault();
+        const reader = new FileReader();
+        reader.onload = ev => importCsv(ev.target.result, f.name);
+        reader.readAsText(f);
+        return;
+    }
+    const link = normalizeLink(e.dataTransfer.getData('text/uri-list').split(/\r?\n/)[0] || '');
+    if (link) { e.preventDefault(); openTileDialog(link); }
+});
 // Upload CSV functionality
 document.getElementById('editorBtn').addEventListener('click', () => { location.hash = EDITOR_ROUTE; });
 document.getElementById('uploadBtn').addEventListener('click', () => {
@@ -1056,15 +1198,7 @@ document.getElementById('csvFileInput').addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            const csvContent = e.target.result;
-            saveCsvData(csvContent);
-            // Update the data and re-render
-            setData(csvContent);
-            edit = null;
-            location.hash = 'home';
-            render();
-        };
+        reader.onload = (e) => importCsv(e.target.result, file.name);
         reader.readAsText(file);
     }
     // Reset the file input so the same file can be selected again
@@ -1090,7 +1224,7 @@ render();
 </html>
 <!--
   ============================================================
-  BUILD: 2026-11-03 09:05:41 (local)
+  BUILD: 2026-11-07 15:09:00 (local)
   ------------------------------------------------------------
   MAINTENANCE RULE — READ BEFORE EDITING THIS FILE:
   Whenever the code in this file is modified in any way,
