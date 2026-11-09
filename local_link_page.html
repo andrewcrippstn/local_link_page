@@ -47,20 +47,19 @@
                  background:#667eea;color:#fff;font-size:8px;font-weight:700;letter-spacing:.6px;
                  text-align:center;transform:rotate(-45deg);box-shadow:0 1px 2px rgba(0,0,0,.25)}
 
-    /* ---- arrange (edit) mode ---- */
-    .arrange-btn{position:absolute;top:0;right:50px;width:40px;height:40px;background:white;border:2px solid #e0e0e0;
-                 border-radius:8px;display:none;align-items:center;justify-content:center;cursor:pointer;transition:.2s;
-                 color:#667eea;font-size:20px;font-weight:bold}
-    .arrange-btn:hover{border-color:#667eea;background:#f8f8ff}
-    .arrange-btn.active{background:#667eea;border-color:#667eea;color:#fff}
-    .arrange-btn.show{display:flex}
-    #arrangeBar{display:none;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:8px 12px;
-                background:#eef0ff;border:1px solid #c9ceff;border-radius:8px;font-size:.85rem;color:#445}
-    #arrangeBar .spacer{flex:1}
-    #grid.arranging a.tile{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
-                           border-style:dashed;border-color:#9aa3f5}
-    #grid.arranging a.tile:hover{transform:none}
-    #grid.arranging a.tile *{-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
+    /* ---- drag to rearrange / tile menu (no separate edit mode) ---- */
+    a.tile{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+    a.tile *{-webkit-user-drag:none}
+    a.tile.lifted{transform:scale(1.06);z-index:20;border-color:#667eea;box-shadow:0 8px 20px rgba(0,0,0,.25)}
+    body.dragging-tile{user-select:none;-webkit-user-select:none;cursor:grabbing}
+    body.dragging-tile #trashZone{display:flex}
+    #ctxMenu{display:none;position:fixed;z-index:40;min-width:170px;background:#fff;border:1px solid #ddd;border-radius:8px;
+             box-shadow:0 8px 24px rgba(0,0,0,.22);padding:4px}
+    #ctxMenu button{display:flex;width:100%;gap:10px;align-items:center;background:none;border:0;border-radius:6px;padding:8px 10px;
+                    font:inherit;font-size:.9rem;color:#333;cursor:pointer;text-align:left}
+    #ctxMenu button:hover,#ctxMenu button:focus{background:#f0f2ff;outline:none}
+    #ctxMenu button.danger{color:#c0392b}
+    #ctxMenu button.danger:hover,#ctxMenu button.danger:focus{background:#fdecea}
     #grid a.tile.dragging{z-index:20;opacity:.92;cursor:grabbing;transition:none;border-style:solid;
                           border-color:#667eea;box-shadow:0 12px 28px rgba(0,0,0,.28)}
     #grid a.tile.drop-before::before,#grid a.tile.drop-after::before{content:'';position:absolute;top:-2px;bottom:-2px;
@@ -79,6 +78,7 @@
     .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
     .tbtn{padding:6px 12px;border:1px solid #c6c6c6;background:#fff;border-radius:4px;cursor:pointer;font:inherit;font-size:.85rem;color:#333}
     .tbtn:hover{background:#f3f3f3}
+    .tbtn:disabled{opacity:.6;cursor:wait}
     .tbtn.primary{background:#217346;border-color:#217346;color:#fff}
     .tbtn.primary:hover{background:#1b5e39}
     .tbtn.primary.dirty{box-shadow:0 0 0 3px rgba(33,115,70,.3)}
@@ -124,9 +124,8 @@
     .dlg-foot .spacer{flex:1}
 
     #grid a.tile.drop-into{border-color:#667eea;background:#eef0ff;box-shadow:0 0 0 3px rgba(102,126,234,.35)}
-    #upZone{display:none;margin-bottom:16px;padding:12px;text-align:center;border:2px dashed #9aa3f5;border-radius:10px;
-            color:#556;font-size:.85rem;background:#fafaff}
-    #upZone.over{background:#eef0ff;border-color:#667eea;border-style:solid}
+    header.droppable{outline:2px dashed #9aa3f5;outline-offset:-4px}
+    header.droppable.over{outline:2px solid #667eea;background:#eef0ff}
     #trashZone{display:none;position:fixed;right:24px;bottom:44px;width:84px;height:84px;border-radius:50%;
                align-items:center;justify-content:center;flex-direction:column;gap:2px;z-index:15;
                background:#fff;border:2px dashed #e08a8a;color:#c0392b;font-size:.7rem;font-weight:600;
@@ -135,8 +134,8 @@
     #trashZone.over{background:#fdecea;border-style:solid;border-color:#c0392b;transform:scale(1.12)}
     #tdKind{font-size:.8rem;color:#445;background:#eef0ff;border:1px solid #c9ceff;border-radius:4px;padding:6px 8px}
     /* ---- new-tile dialog (opened by pasting a link) ---- */
-    #tileDialog{margin:auto;border:0;border-radius:10px;padding:0;width:min(520px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.35)}
-    #tileDialog::backdrop{background:rgba(0,0,0,.45)}
+    #tileDialog,#moveDialog{margin:auto;border:0;border-radius:10px;padding:0;width:min(520px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.35)}
+    #tileDialog::backdrop,#moveDialog::backdrop{background:rgba(0,0,0,.45)}
     .tile-dlg{height:auto;max-height:90vh}
     .tile-fields{display:flex;flex-direction:column;gap:10px;padding:14px 16px 4px;overflow:auto}
     .tile-fields label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:#555;font-weight:600}
@@ -144,12 +143,38 @@
     .tile-fields input,.tile-fields textarea{border:1px solid #c6c6c6;border-radius:4px;padding:6px 8px;font:inherit;
                                               font-size:.9rem;font-weight:400;color:#222;outline:none;resize:vertical}
     .tile-fields input:focus,.tile-fields textarea:focus{border-color:#667eea}
-    .add-btn{position:absolute;top:0;width:40px;height:40px;background:white;border:2px solid #e0e0e0;border-radius:8px;
+    .tile-fields select{border:1px solid #c6c6c6;border-radius:4px;padding:6px 8px;font:inherit;font-size:.9rem;font-weight:400;color:#222;background:#fff}
+    .add-btn,.back-btn{position:absolute;top:0;width:40px;height:40px;background:white;border:2px solid #e0e0e0;border-radius:8px;
              display:none;align-items:center;justify-content:center;cursor:pointer;transition:.2s;color:#667eea;font-size:20px;font-weight:bold}
-    .add-btn:hover{border-color:#667eea;background:#f8f8ff}
-    .add-btn.show{display:flex}
+    .add-btn:hover,.back-btn:hover{border-color:#667eea;background:#f8f8ff}
+    .add-btn.show,.back-btn.show{display:flex}
+    .back-btn{left:0;text-decoration:none}
+    /* right-hand buttons: one flex group instead of hand-placed offsets, so they never sit on top of the title */
+    header .hdr-actions{position:absolute;top:0;right:0;display:flex;gap:10px}
+    header .hdr-actions > *{position:static;right:auto;flex:0 0 auto}
+    .menu-btn{display:none;width:40px;height:40px;background:white;border:2px solid #e0e0e0;border-radius:8px;cursor:pointer;
+              align-items:center;justify-content:center;color:#667eea;font-size:22px;font-weight:bold;transition:.2s}
+    .menu-btn:hover,.menu-btn.open{border-color:#667eea;background:#f8f8ff}
+    @media (max-width:720px){
+        header{padding:10px 12px}
+        .header-container{justify-content:space-between;gap:10px}
+        .header-container h1{flex:1;min-width:0;font-size:1.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        header .back-btn{position:static;order:0}
+        .menu-btn{display:flex;order:3}
+        /* the icon buttons collapse into a dropdown list under the ☰ button */
+        header .hdr-actions{display:none;position:absolute;top:48px;right:0;z-index:25;flex-direction:column;gap:0;min-width:230px;
+                            background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:4px;overflow:hidden}
+        header .hdr-actions.open{display:flex}
+        header .hdr-actions > *{width:100%;height:44px;border:0;border-radius:6px;box-shadow:none;justify-content:flex-start;gap:12px;padding:0 12px;
+                                font-size:20px;text-decoration:none;color:#667eea;background:transparent}
+        header .hdr-actions > *:hover,header .hdr-actions > *.active{background:#f0f2ff}
+        header .hdr-actions > *::after{content:attr(title);font-size:.9rem;font-weight:500;color:#333;text-align:left;
+                                       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    }
     #toast{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);display:none;align-items:center;gap:14px;
            background:#333;color:#fff;padding:10px 14px;border-radius:8px;font-size:.85rem;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:30}
+    #toast.ok{background:#2e7d32}
+    #toast.err{background:#c62828}
     #toast button{background:none;border:0;color:#9aa3f5;font:inherit;font-weight:600;cursor:pointer}
     .tbtn.danger{color:#c0392b;border-color:#e08a8a}
     .tbtn.danger:hover{background:#fdecea}
@@ -159,29 +184,45 @@
 <body>
 <header>
     <div class="header-container">
-        <a href="#home" class="home-btn" id="homeBtn" title="Home">⌂</a>
+        <a href="#home" class="back-btn" id="backBtn" title="Back">←</a>
         <h1 id="pageHeader">Home</h1>
+        <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">☰</button>
+        <div class="hdr-actions" id="hdrActions">
         <button class="add-btn" id="addBtn" title="Add a tile (or just paste a link)">+</button>
-        <button class="arrange-btn" id="arrangeBtn" title="Rearrange tiles">⇄</button>
         <button class="editor-btn" id="editorBtn" title="Edit data (spreadsheet view)">✎</button>
         <button class="download-btn" id="downloadBtn" title="Download CSV">↓</button>
         <button class="upload-btn" id="uploadBtn" title="Upload CSV">↑</button>
+        <a href="#home" class="home-btn" id="homeBtn" title="Home">⌂</a>
+        </div>
         <input type="file" id="csvFileInput" accept=".csv">
     </div>
 </header>
 <div class="container">
-    <div id="arrangeBar">
-        <span class="spacer"></span>
-        <button class="tbtn primary" id="arrangeDone" type="button">Done</button>
-    </div>
-    <div id="upZone">↩ Drop a tile here to move it up to <b id="upName"></b></div>
     <div id="grid"></div>
     <datalist id="pageList"></datalist>
     <div id="trashZone"><span class="ico">🗑</span><span>Delete</span></div>
     <div id="editor"></div>
 </div>
 <div id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastUndo">Undo</button></div>
-<div id="BUILD-FOOTER">BUILD: 2026-11-07 15:09:00</div>
+<div id="ctxMenu" role="menu">
+    <button type="button" role="menuitem" id="ctxEdit">✎ Edit…</button>
+    <button type="button" role="menuitem" id="ctxMove">⇄ Move to…</button>
+    <button type="button" role="menuitem" id="ctxDelete" class="danger">🗑 Delete</button>
+</div>
+<dialog id="moveDialog">
+    <form class="dlg tile-dlg" id="moveForm" autocomplete="off">
+        <div class="dlg-head"><span id="mvHead">Move to…</span></div>
+        <div class="tile-fields">
+            <label>Destination<select id="mvSelect"></select></label>
+        </div>
+        <div class="dlg-foot">
+            <span class="spacer"></span>
+            <button class="tbtn" id="mvCancel" type="button">Cancel</button>
+            <button class="tbtn primary" type="submit">Move</button>
+        </div>
+    </form>
+</dialog>
+<div id="BUILD-FOOTER">BUILD: 2026-11-10 08:36:00</div>
 <dialog id="cellDialog">
     <div class="dlg">
         <div class="dlg-head"><span id="dlgTitle"></span><span class="dlg-count" id="dlgCount"></span></div>
@@ -273,7 +314,7 @@ function parseCsv(csvText) {
     return { headers, items };
 }
 
-// Load CSV data from localStorage or use default
+// Load CSV data from localStorage (falls back to an in-memory copy if storage is blocked) or use default
 let memStore = null;
 function loadCsvData() {
     try { const saved = localStorage.getItem('csvData'); if (saved) return saved; } catch (e) {}
@@ -299,10 +340,13 @@ let visibleItems = [];
 const undoStack = [];
 let toastTimer = null;
 function pushUndo() { undoStack.push(csvData); if (undoStack.length > 30) undoStack.shift(); }
-function showToast(msg) {
+// kind: '' (normal) | 'ok' (green) | 'err' (red)
+function showToast(msg, noUndo, kind) {
+    const t = document.getElementById('toast');
     document.getElementById('toastMsg').textContent = msg;
-    document.getElementById('toastUndo').style.display = undoStack.length ? '' : 'none';
-    document.getElementById('toast').style.display = 'flex';
+    document.getElementById('toastUndo').style.display = (undoStack.length && !noUndo) ? '' : 'none';
+    t.className = kind || '';
+    t.style.display = 'flex';
     clearTimeout(toastTimer);
     toastTimer = setTimeout(hideToast, 7000);
 }
@@ -322,13 +366,11 @@ document.addEventListener('keydown', e => {
     if (currentPage() === EDITOR_ROUTE) return;
     e.preventDefault(); undo();
 });
-let arrange = false;      // tile-arrange (edit) mode on/off
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function currentPage() { return location.hash.slice(1) || 'home'; }
 function render() {
     const current = currentPage();
     const editing = current === EDITOR_ROUTE;
-    if (editing) arrange = false;
     document.getElementById('pageTitle').textContent =
     document.getElementById('pageHeader').textContent =
         current === 'home' ? 'Home' : editing ? 'Data editor' : current.charAt(0).toUpperCase() + current.slice(1);
@@ -338,27 +380,22 @@ function render() {
     const uploadBtn = document.getElementById('uploadBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const editorBtn = document.getElementById('editorBtn');
-    const arrangeBtn = document.getElementById('arrangeBtn');
     const onHome = current === 'home';
     homeBtn.classList.toggle('show', !onHome);
     uploadBtn.classList.toggle('show', onHome);
     downloadBtn.classList.toggle('show', onHome);
     editorBtn.classList.toggle('show', onHome);
-    arrangeBtn.classList.toggle('show', !editing);
-    arrangeBtn.classList.toggle('active', arrange);
-    arrangeBtn.style.right = onHome ? '150px' : '50px';
     const addBtn = document.getElementById('addBtn');
     addBtn.classList.toggle('show', !editing);
-    addBtn.style.right = onHome ? '200px' : '100px';
-    document.getElementById('arrangeBar').style.display = arrange ? 'flex' : 'none';
-    document.getElementById('trashZone').style.display = (arrange && !editing) ? 'flex' : 'none';
     const upRow = items.find(r => r.url === '#' + current);
-    document.getElementById('upZone').style.display = (arrange && !onHome && !editing) ? 'block' : 'none';
-    document.getElementById('upName').textContent = upRow ? (upRow.page === 'home' ? 'Home' : upRow.page) : 'Home';
+    const backBtn = document.getElementById('backBtn');           // goes up one level (to the folder this page lives in)
+    const parent = upRow ? upRow.page : 'home';
+    backBtn.classList.toggle('show', !onHome);
+    backBtn.href = '#' + parent;
+    backBtn.title = 'Back to ' + (parent === 'home' ? 'Home' : parent);
     // The editor is a separate view that replaces the tile grid
     document.getElementById('editor').style.display = editing ? 'block' : 'none';
     document.getElementById('grid').style.display = editing ? 'none' : '';
-    document.getElementById('grid').classList.toggle('arranging', arrange);
     document.querySelector('.container').classList.toggle('wide', editing);
     if (editing) { renderEditor(); return; }
    
@@ -441,26 +478,21 @@ function copyText(tile, text) {
     });
 }
 document.getElementById('grid').addEventListener('click', (event) => {
-    if (arrange) {                                // arrange mode: tiles never navigate or copy
-        const t = event.target.closest('a.tile');
-        if (t) {
-            event.preventDefault();
-            if (!justDragged) openEditDialog(visibleItems[Array.prototype.indexOf.call(gridEl.children, t)]);
-        }
-        return;
-    }
+    if (justDragged) { event.preventDefault(); return; }        // the click that ends a drag / long press must not open the tile
     const tile = event.target.closest('a.tile[data-copy-index]');
     if (!tile) return;
     event.preventDefault();
     copyText(tile, visibleItems[tile.dataset.copyIndex].copy);
 });
 
-/* ======================= Arrange mode (drag tiles to reorder) ======================= */
+/* ======================= Drag tiles to reorder / move into a folder / delete (always on) ======================= */
+// Mouse: press and move a few pixels to pick a tile up (a plain click still opens it).
+// Touch: long press picks it up (so scrolling still works); a long press without moving opens the tile menu.
 const gridEl = document.getElementById('grid');
-let drag = null;
-let justDragged = false;   // a drag just ended: ignore the click that follows it     // { tile, from, x, y, sx, sy, moved, target, after }
+let drag = null;           // { tile, from, x, y, sx, sy, moved, target, after }
+let justDragged = false;   // a drag just ended: ignore the click that follows it
 
-function setArrange(on) { arrange = on; render(); }
+function suppressClick(ms) { justDragged = true; setTimeout(() => { justDragged = false; }, ms); }
 // write the current `items` back to storage and redraw
 function persistItems(msg) {
     pushUndo();
@@ -514,7 +546,7 @@ function deleteTile(from) {
     const inside = doomed.size - 1;
     const msg = inside > 0 ? `Delete folder "${item.text}" and the ${inside} item${inside === 1 ? '' : 's'} inside it?`
                            : `Delete "${item.text}"?`;
-    if (inside > 0 && !confirm(msg)) return;
+    if (inside > 0 && !confirm(msg)) return;            // single tiles are deleted straight away (Undo is offered)
     items = items.filter(r => !doomed.has(r));
     persistItems(`Deleted "${item.text}"` + (inside > 0 ? ` and ${inside} inside` : ''));
 }
@@ -536,25 +568,37 @@ function moveToPage(from, dest) {
 }
 function clearDropMarks() {
     gridEl.querySelectorAll('.drop-before,.drop-after,.drop-into').forEach(t => t.classList.remove('drop-before', 'drop-after', 'drop-into'));
-    document.getElementById('upZone').classList.remove('over');
+    document.querySelector('header').classList.remove('over');
     document.getElementById('trashZone').classList.remove('over');
 }
 gridEl.addEventListener('pointerdown', e => {
-    if (!arrange || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     const tile = e.target.closest('a.tile');
     if (!tile) return;
-    e.preventDefault();
+    const touch = e.pointerType === 'touch';
     drag = { tile, from: Array.prototype.indexOf.call(gridEl.children, tile),
              x: e.clientX, y: e.clientY, sx: window.scrollX, sy: window.scrollY,
+             touch, armed: !touch, timer: null,
              moved: false, target: null, after: false, into: false, up: false, trash: false };
+    if (touch) drag.timer = setTimeout(() => {                  // long press: pick the tile up
+        if (!drag || drag.tile !== tile) return;
+        drag.armed = true;
+        tile.classList.add('lifted');
+        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
+    }, 420);
 });
 document.addEventListener('pointermove', e => {
     if (!drag) return;
     const dx = e.clientX - drag.x + (window.scrollX - drag.sx);
     const dy = e.clientY - drag.y + (window.scrollY - drag.sy);
     if (!drag.moved) {
-        if (Math.hypot(dx, dy) < 6) return;             // small wobble = a click, not a drag
+        if (Math.hypot(dx, dy) < (drag.touch ? 10 : 6)) return;   // small wobble = a click / press, not a drag
+        if (!drag.armed) { clearTimeout(drag.timer); drag = null; return; }   // touch moved before the long press: it's a scroll
         drag.moved = true;
+        closeMenu();
+        document.body.classList.add('dragging-tile');   // shows the bin
+        if (currentPage() !== 'home') document.querySelector('header').classList.add('droppable');   // title bar = "move up a level"
+        drag.tile.classList.remove('lifted');
         drag.tile.classList.add('dragging');
         drag.tile.style.pointerEvents = 'none';         // so elementFromPoint sees the tile underneath
     }
@@ -563,7 +607,7 @@ document.addEventListener('pointermove', e => {
     const t = el && el.closest ? el.closest('#grid a.tile') : null;
     clearDropMarks();
     drag.target = null; drag.into = false; drag.up = false; drag.trash = false;
-    const up = el && el.closest ? el.closest('#upZone') : null;
+    const up = (currentPage() !== 'home' && el && el.closest) ? el.closest('header') : null;
     const bin = el && el.closest ? el.closest('#trashZone') : null;
     if (bin) { drag.trash = true; bin.classList.add('over'); }
     else if (up) { drag.up = true; up.classList.add('over'); }
@@ -583,7 +627,15 @@ document.addEventListener('pointermove', e => {
 function endDrag(commit) {
     if (!drag) return;
     const d = drag; drag = null;
-    if (d.moved) { justDragged = true; setTimeout(() => { justDragged = false; }, 60); }
+    clearTimeout(d.timer);
+    d.tile.classList.remove('lifted');
+    document.body.classList.remove('dragging-tile');
+    document.querySelector('header').classList.remove('droppable');
+    if (d.moved) suppressClick(d.touch ? 350 : 60);
+    else if (commit && d.touch && d.armed) {            // long press without moving: open the tile menu
+        suppressClick(350);
+        openMenu(d.tile, d.x, d.y + 8);
+    }
     clearDropMarks();
     d.tile.classList.remove('dragging');
     d.tile.style.transform = '';
@@ -598,11 +650,8 @@ function endDrag(commit) {
 }
 document.addEventListener('pointerup', () => endDrag(true));
 document.addEventListener('pointercancel', () => endDrag(false));
-document.getElementById('arrangeBtn').addEventListener('click', () => setArrange(!arrange));
-document.getElementById('arrangeDone').addEventListener('click', () => setArrange(false));
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && arrange && !document.querySelector('dialog[open]')) setArrange(false);
-});
+// once a touch drag is under way, stop the page from scrolling under the finger
+document.addEventListener('touchmove', e => { if (drag && drag.touch && drag.armed && e.cancelable) e.preventDefault(); }, { passive: false });
 
 /* ======================= Paste a link -> new tile dialog ======================= */
 const tileDialog = document.getElementById('tileDialog');
@@ -675,6 +724,7 @@ function openEditDialog(item) {
     byId('tdText').focus();
     byId('tdText').select();
 }
+// several links pasted at once (one per line): add each as a tile on the current page
 function addLinkTiles(hrefs) {
     const page = currentPage();
     let last = -1;
@@ -721,6 +771,15 @@ document.addEventListener('paste', e => {
 byId('tdCancel').addEventListener('click', () => tileDialog.close());
 tileDialog.addEventListener('close', () => { editTarget = null; });
 byId('addBtn').addEventListener('click', openNewTileDialog);
+(function headerMenu() {                      // ☰ dropdown (only visible on narrow screens)
+    const btn = byId('menuBtn'), panel = byId('hdrActions');
+    const setOpen = o => { panel.classList.toggle('open', o); btn.classList.toggle('open', o); };
+    btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!panel.classList.contains('open')); });
+    panel.addEventListener('click', () => setOpen(false));
+    document.addEventListener('click', e => { if (!panel.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+    window.addEventListener('resize', () => setOpen(false));
+})();
 byId('tdDelete').addEventListener('click', () => {
     const t = editTarget; tileDialog.close();
     const idx = visibleItems.indexOf(t);
@@ -764,6 +823,88 @@ byId('tileForm').addEventListener('submit', e => {
     if (last < 0) items.push(row); else items.splice(last + 1, 0, row);
     persistItems();
 });
+
+/* ======================= Tile menu (right-click, long press, context-menu key) ======================= */
+let lastPointerType = 'mouse', ctxItem = null, menuAt = 0;
+const ctxMenu = byId('ctxMenu');
+// pages a tile could be moved to (not where it already is; a folder can't go inside itself)
+function movePages(item) {
+    const set = new Set(['home']);
+    items.forEach(r => { if (r.page) set.add(r.page); if (r.url.startsWith('#') && r.url.length > 1) set.add(r.url.slice(1)); });
+    const isFolder = item.url.startsWith('#') && item.url.length > 1;
+    return Array.from(set)
+        .filter(p => p !== item.page && !(isFolder && insideFolder(p, item.url.slice(1))))
+        .sort((a, b) => a === 'home' ? -1 : b === 'home' ? 1 : a.localeCompare(b));
+}
+function openMenu(tile, x, y) {
+    const item = visibleItems[Array.prototype.indexOf.call(gridEl.children, tile)];
+    if (!item) return;
+    ctxItem = item; menuAt = Date.now();
+    byId('ctxMove').style.display = movePages(item).length ? '' : 'none';
+    ctxMenu.style.display = 'block';
+    ctxMenu.style.left = Math.max(4, Math.min(x, window.innerWidth - ctxMenu.offsetWidth - 4)) + 'px';
+    ctxMenu.style.top = Math.max(4, Math.min(y, window.innerHeight - ctxMenu.offsetHeight - 4)) + 'px';
+    if (lastPointerType === 'key') byId('ctxEdit').focus();
+}
+function closeMenu() { ctxMenu.style.display = 'none'; ctxItem = null; }
+document.addEventListener('pointerdown', e => {
+    lastPointerType = e.pointerType;
+    if (!e.target.closest('#ctxMenu')) closeMenu();
+}, true);
+document.addEventListener('keydown', () => { lastPointerType = 'key'; }, true);
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { if (drag && drag.moved) endDrag(false); else closeMenu(); }     // Esc cancels a drag / closes the menu
+    if (ctxMenu.style.display === 'block' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        const b = Array.from(ctxMenu.querySelectorAll('button')).filter(x => x.style.display !== 'none');
+        const i = b.indexOf(document.activeElement);
+        b[(i + (e.key === 'ArrowDown' ? 1 : -1) + b.length) % b.length].focus();
+    }
+});
+window.addEventListener('resize', closeMenu);
+window.addEventListener('scroll', closeMenu, true);
+document.addEventListener('contextmenu', e => {
+    const tile = e.target.closest && e.target.closest('#grid a.tile');
+    if (!tile) return;
+    e.preventDefault();                                         // never show the browser's own menu on a tile
+    if (lastPointerType === 'touch') return;                    // touch long press is handled by the drag code
+    const r = tile.getBoundingClientRect();
+    const fromKey = e.clientX === 0 && e.clientY === 0;         // context-menu key / Shift+F10 on a focused tile
+    openMenu(tile, fromKey ? r.left + 20 : e.clientX, fromKey ? r.top + 20 : e.clientY);
+});
+byId('ctxEdit').addEventListener('click', () => {
+    if (Date.now() - menuAt < 350) return;                      // ignore the click that follows a touch long press
+    const it = ctxItem; closeMenu(); openEditDialog(it);
+});
+byId('ctxDelete').addEventListener('click', () => {
+    if (Date.now() - menuAt < 350) return;
+    const idx = visibleItems.indexOf(ctxItem); closeMenu();
+    if (idx >= 0) deleteTile(idx);
+});
+byId('ctxMove').addEventListener('click', () => {
+    if (Date.now() - menuAt < 350) return;
+    const it = ctxItem; closeMenu(); openMoveDialog(it);
+});
+// "Move to…" dialog
+const moveDialog = byId('moveDialog');
+let moveItem = null;
+function openMoveDialog(item) {
+    const pages = movePages(item);
+    if (!item || !pages.length || moveDialog.open) return;
+    moveItem = item;
+    byId('mvHead').textContent = 'Move "' + item.text + '" to…';
+    byId('mvSelect').innerHTML = pages.map(p => '<option value="' + esc(p) + '">' + esc(p === 'home' ? 'Home' : p.replace(/_/g, ' ')) + '</option>').join('');
+    moveDialog.showModal();
+    byId('mvSelect').focus();
+}
+byId('mvCancel').addEventListener('click', () => moveDialog.close());
+byId('moveForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const idx = visibleItems.indexOf(moveItem), dest = byId('mvSelect').value;
+    moveDialog.close();
+    if (idx >= 0) moveToPage(idx, dest);
+});
+moveDialog.addEventListener('close', () => { moveItem = null; });
 
 /* ======================= In-app CSV editor ======================= */
 const EDITOR_ROUTE = '_editor';
@@ -859,7 +1000,7 @@ function renderEditor() {
     const tbody = table.querySelector('tbody');
     tbody.addEventListener('dragover', onRowDragOver);
     tbody.addEventListener('drop', onRowDrop);
-    tbody.addEventListener('dragleave', e => { if (!tbody.contains(e.relatedTarget)) clearDragMarks(); });
+    tbody.addEventListener('dragleave', e => { if (!tbody.contains(e.relatedTarget)) clearRowDragMarks(); });
 
     renderRows();
 }
@@ -914,6 +1055,7 @@ function renderRows() {
     tbody.innerHTML = '';
     tbody.appendChild(frag);
     edit.shown = shown;
+    // suggestions for the "page" column: every page name already in use
     document.getElementById('pageList').innerHTML = Array.from(new Set(edit.rows.map(r => r.page).filter(Boolean)))
         .map(p => '<option value="' + esc(p) + '">').join('');
     updateEditStatus();
@@ -1142,6 +1284,7 @@ document.addEventListener('keydown', e => {
 });
 
 
+// Import a CSV (validated, undoable)
 function importCsv(text, name) {
     const p = parseCsv(text);
     if (!['page', 'text', 'url'].every(c => p.headers.includes(c))) {
@@ -1157,6 +1300,7 @@ function importCsv(text, name) {
     render();
     showToast('Imported ' + p.items.length + ' tiles');
 }
+// Drag a .csv file (import) or a link (new tile) from outside onto the page
 document.addEventListener('dragover', e => {
     const types = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
     if (!dragState && currentPage() !== EDITOR_ROUTE && (types.includes('Files') || types.includes('text/uri-list'))) e.preventDefault();
@@ -1224,7 +1368,7 @@ render();
 </html>
 <!--
   ============================================================
-  BUILD: 2026-11-07 15:09:00 (local)
+  BUILD: 2026-11-10 08:36:00 (local)
   ------------------------------------------------------------
   MAINTENANCE RULE — READ BEFORE EDITING THIS FILE:
   Whenever the code in this file is modified in any way,
